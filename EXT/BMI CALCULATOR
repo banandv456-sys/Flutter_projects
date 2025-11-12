@@ -1,0 +1,312 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(SmartBmiApp());
+}
+
+class SmartBmiApp extends StatefulWidget {
+  @override
+  State<SmartBmiApp> createState() => _SmartBmiAppState();
+}
+
+class _SmartBmiAppState extends State<SmartBmiApp> {
+  bool isDark = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Smart BMI Calculator',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: isDark ? Brightness.dark : Brightness.light,
+        colorSchemeSeed: Colors.teal,
+        useMaterial3: true,
+      ),
+      home: MainScreen(
+        toggleTheme: () => setState(() => isDark = !isDark),
+        isDark: isDark,
+      ),
+    );
+  }
+}
+
+class MainScreen extends StatefulWidget {
+  final VoidCallback toggleTheme;
+  final bool isDark;
+
+  const MainScreen({required this.toggleTheme, required this.isDark});
+
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int _index = 0;
+  List<Map<String, dynamic>> bmiHistory = [];
+  Map<String, dynamic> profile = {"name": "", "age": 20, "gender": "Male"};
+
+  @override
+  Widget build(BuildContext context) {
+    final tabs = [
+      HomeTab(onAdd: (bmi) {
+        setState(() => bmiHistory.add(bmi));
+      }),
+      HistoryTab(history: bmiHistory),
+      TipsTab(),
+      ProfileTab(profile: profile, onSave: (data) => setState(() => profile = data)),
+      SettingsTab(
+        isDark: widget.isDark,
+        onToggleTheme: widget.toggleTheme,
+      ),
+    ];
+
+    return Scaffold(
+      body: tabs[_index],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home), label: "Home"),
+          NavigationDestination(icon: Icon(Icons.history), label: "History"),
+          NavigationDestination(icon: Icon(Icons.lightbulb), label: "Tips"),
+          NavigationDestination(icon: Icon(Icons.person), label: "Profile"),
+          NavigationDestination(icon: Icon(Icons.settings), label: "Settings"),
+        ],
+      ),
+    );
+  }
+}
+
+class HomeTab extends StatefulWidget {
+  final Function(Map<String, dynamic>) onAdd;
+  const HomeTab({required this.onAdd});
+
+  @override
+  State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
+  double height = 170;
+  double weight = 65;
+  int age = 25;
+  String gender = "Male";
+  double? result;
+  String message = "";
+  Color resultColor = Colors.grey;
+
+  void calculateBMI() {
+    double bmi = weight / ((height / 100) * (height / 100));
+    String category;
+    Color color;
+    if (bmi < 18.5) {
+      category = "Underweight";
+      color = Colors.blue;
+      message = "Eat healthy and gain some weight!";
+    } else if (bmi < 25) {
+      category = "Normal";
+      color = Colors.green;
+      message = "Great job! Keep maintaining your lifestyle!";
+    } else if (bmi < 30) {
+      category = "Overweight";
+      color = Colors.orange;
+      message = "Try some workouts and balanced diet!";
+    } else {
+      category = "Obese";
+      color = Colors.red;
+      message = "Consult a doctor and exercise regularly.";
+    }
+
+    setState(() {
+      result = bmi;
+      resultColor = color;
+    });
+
+    widget.onAdd({
+      "bmi": bmi.toStringAsFixed(1),
+      "category": category,
+      "date": DateTime.now().toString().split(' ')[0],
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Text("Smart BMI Calculator", style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 20),
+              ToggleButtons(
+                borderRadius: BorderRadius.circular(12),
+                isSelected: [gender == "Male", gender == "Female"],
+                onPressed: (i) => setState(() => gender = i == 0 ? "Male" : "Female"),
+                children: const [Padding(padding: EdgeInsets.all(10), child: Text("Male")), Padding(padding: EdgeInsets.all(10), child: Text("Female"))],
+              ),
+              const SizedBox(height: 20),
+              Text("Height: ${height.toStringAsFixed(0)} cm"),
+              Slider(value: height, min: 100, max: 220, onChanged: (v) => setState(() => height = v)),
+              Text("Weight: ${weight.toStringAsFixed(0)} kg"),
+              Slider(value: weight, min: 30, max: 150, onChanged: (v) => setState(() => weight = v)),
+              Text("Age: $age"),
+              Slider(value: age.toDouble(), min: 10, max: 80, onChanged: (v) => setState(() => age = v.toInt())),
+              const SizedBox(height: 10),
+              ElevatedButton(onPressed: calculateBMI, child: const Text("Calculate BMI")),
+              if (result != null) ...[
+                const SizedBox(height: 20),
+                Text("Your BMI: ${result!.toStringAsFixed(1)}", style: TextStyle(fontSize: 24, color: resultColor, fontWeight: FontWeight.bold)),
+                Text(message, textAlign: TextAlign.center),
+              ]
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HistoryTab extends StatelessWidget {
+  final List<Map<String, dynamic>> history;
+  const HistoryTab({required this.history});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("History")),
+      body: history.isEmpty
+          ? const Center(child: Text("No BMI records yet"))
+          : ListView.builder(
+              itemCount: history.length,
+              itemBuilder: (context, i) {
+                final h = history[i];
+                return Card(
+                  margin: const EdgeInsets.all(8),
+                  child: ListTile(
+                    title: Text("BMI: ${h['bmi']} (${h['category']})"),
+                    subtitle: Text("Date: ${h['date']}"),
+                    leading: Icon(Icons.favorite, color: h['category'] == "Normal" ? Colors.green : Colors.red),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
+
+class TipsTab extends StatelessWidget {
+  final Map<String, List<String>> tips = {
+    "Underweight": ["Eat more protein-rich foods", "Increase meal frequency", "Try healthy snacks"],
+    "Normal": ["Keep a balanced diet", "Stay hydrated", "Exercise regularly"],
+    "Overweight": ["Avoid sugary drinks", "Do cardio exercises", "Eat more fiber"],
+    "Obese": ["Consult a nutritionist", "Start light workouts", "Monitor calorie intake"]
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Health Tips")),
+      body: ListView(
+        children: tips.entries.map((e) {
+          return Card(
+            margin: const EdgeInsets.all(10),
+            child: ExpansionTile(
+              title: Text(e.key, style: const TextStyle(fontWeight: FontWeight.bold)),
+              children: e.value.map((t) => ListTile(title: Text(t))).toList(),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class ProfileTab extends StatefulWidget {
+  final Map<String, dynamic> profile;
+  final Function(Map<String, dynamic>) onSave;
+  const ProfileTab({required this.profile, required this.onSave});
+
+  @override
+  State<ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<ProfileTab> {
+  late TextEditingController nameCtrl;
+  late int age;
+  late String gender;
+
+  @override
+  void initState() {
+    nameCtrl = TextEditingController(text: widget.profile["name"]);
+    age = widget.profile["age"];
+    gender = widget.profile["gender"];
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Profile")),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "Name")),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text("Gender: "),
+                DropdownButton<String>(
+                  value: gender,
+                  items: const [
+                    DropdownMenuItem(value: "Male", child: Text("Male")),
+                    DropdownMenuItem(value: "Female", child: Text("Female")),
+                  ],
+                  onChanged: (v) => setState(() => gender = v!),
+                ),
+              ],
+            ),
+            Text("Age: $age"),
+            Slider(value: age.toDouble(), min: 10, max: 80, onChanged: (v) => setState(() => age = v.toInt())),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                widget.onSave({"name": nameCtrl.text, "age": age, "gender": gender});
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile saved")));
+              },
+              child: const Text("Save Profile"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SettingsTab extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onToggleTheme;
+  const SettingsTab({required this.isDark, required this.onToggleTheme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Settings")),
+      body: ListView(
+        children: [
+          SwitchListTile(
+            title: const Text("Dark Mode"),
+            value: isDark,
+            onChanged: (v) => onToggleTheme(),
+          ),
+          const ListTile(
+            title: Text("About App"),
+            subtitle: Text("Smart BMI Calculator\nVersion 1.0 by Flutter"),
+          ),
+        ],
+      ),
+    );
+  }
+}
